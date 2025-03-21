@@ -4,6 +4,8 @@ import ConnectDb from "@/lib/Db"
 import Event from "@/models/event.model";
 import User from "@/models/user.model";
 import { currentUser } from "@clerk/nextjs/server";
+import mongoose from "mongoose";
+
 
 export const createEvents = async (data) => {
     await ConnectDb();
@@ -96,4 +98,32 @@ export const deleteEvent = async (id) => {
 };
 
 
+export const getEventsDetails = async (name, eventId) => {
+    await ConnectDb();
 
+    try {
+        // Fetch the event and populate userId (user details)
+        const event = await Event.findById(eventId) 
+            .populate({
+                path: "userId",
+                model: "User",   // ✅ Explicitly define the User model
+                select: "name email imageUrl", // ✅ Fetch only necessary fields
+            })
+            .lean();
+
+        if (!event) {
+            throw new Error("Event not found");
+        }
+
+         // ✅ Ensure user exists
+         if (!event.userId) {
+            throw new Error("User details not found for this event");
+        }
+
+        // Rename `userId` to `user` for consistency
+        const eventWithUser = { ...event, user: event.userId };
+        return eventWithUser;
+    } catch (error) {
+        throw new Error("Failed to fetch event details: " + error.message);
+    }
+}

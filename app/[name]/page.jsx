@@ -5,8 +5,8 @@ import { notFound } from "next/navigation";
 import React from "react";
 
 // jst to rank my page on google
-export async function genrateMetaData( params ) {
-  const user = await getuserByName(firstName);
+export async function genrateMetaData( {params} ) {
+  const user = await getuserByName(params.firstName);
 
   if(!user){
     return{
@@ -22,12 +22,12 @@ export async function genrateMetaData( params ) {
 }
 
 const Userpage = async ({ params }) => {
-  if (!params || !params.name) {
+  if (!params || !params?.name) {
     return notFound();
   }
 
   // Extract the full name and use only the first word for searching
-  const firstName = params.name.split(" ")[0];
+  const firstName = params.name?.split(" ")[0];
   const user = await getuserByName(firstName);
 
   if (!user) {
