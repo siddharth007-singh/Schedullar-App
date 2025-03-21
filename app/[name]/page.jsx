@@ -4,6 +4,23 @@ import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { notFound } from "next/navigation";
 import React from "react";
 
+// jst to rank my page on google
+export async function genrateMetaData( params ) {
+  const user = await getuserByName(firstName);
+
+  if(!user){
+    return{
+      title: "User not found",
+    }
+  }
+  else{
+    return{
+      title: `${user.name} - Schedule a meeting`,
+      description: `Book a meeting with ${user.name} to discuss your queries`,
+    }
+  }
+}
+
 const Userpage = async ({ params }) => {
   if (!params || !params.name) {
     return notFound();
