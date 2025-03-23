@@ -1,28 +1,38 @@
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
+import { Clock, Calendar } from 'lucide-react';
 import React from 'react'
 
 const EventsDetails = ({ event }) => {
     if (!event?.user) {
         return <p>Error: User details not available</p>;
     }
-
     const user  = event.user;
-    console.log("🚀 User Data in EventDetails:", user); 
+
+
     return (
-        <div>
-            <h1>{event.title}</h1>
-            <div>
-                <Avatar className="w-24 h-24 mb-4">
+        <div className='p-10 lg:w-1/3 bg-white'>
+            <h1 className='text-3xl font-bold mb-4'>{event.title}</h1>
+            <div className='flex items-center mb-4'>
+                <Avatar className="w-12 h-12 mb-4">
                     <AvatarImage src={user?.imageUrl}/>
                 </Avatar>
-                    
-                <p className="text-gray-600 text-center">
-                    Welcome to my schedulling page. Please select an event to book a slot, and I will get back to you soon.
-                </p>
+                <div>
+                    <h2 className='text-xl font-semibold'>{user.name}</h2>
+                    <p className='text-gray-600'> @{user.email}</p>
+                </div>
             </div>
 
-            <h2 className='text-3xl font-bold mb-2'>{user.name}</h2>
-            <p className='text-3xl font-bold mb-2'> @{user.email}</p>
+            <div className='flex items-center mb-2'>
+                <Clock className='inline-block mr-2' size={20} />
+                <span>{event.duration} minutes</span>
+            </div>
+
+             <div className='flex items-center mb-4'>
+                <Calendar className='inline-block mr-2' size={20} />
+                <span>Google Meet</span>
+            </div>
+
+            <p>{event.description}</p>
         </div>
     )
 }

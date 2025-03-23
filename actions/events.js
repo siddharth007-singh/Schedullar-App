@@ -4,7 +4,11 @@ import ConnectDb from "@/lib/Db"
 import Event from "@/models/event.model";
 import User from "@/models/user.model";
 import { currentUser } from "@clerk/nextjs/server";
+import { addDays, format, parseISO, startOfDay } from "date-fns";
+import Availability from "@/models/available.model";
+import DayAvailability from "@/models/dayavailable.model";
 import mongoose from "mongoose";
+import Booking from "@/models/booking.model";
 
 
 export const createEvents = async (data) => {
@@ -25,7 +29,7 @@ export const createEvents = async (data) => {
                 email: user.emailAddresses[0].emailAddress,
                 name: `${user.firstName} ${user.lastName}`,
             });
-        }   
+        }
 
         const event = await Event.create({
             ...data,
@@ -54,7 +58,7 @@ export const getEvents = async () => {
             .lean();
 
         return {
-            events, username:user.fullName  
+            events, username: user.fullName
         };
     } catch (error) {
         console.error("Error fetching events:", error);
@@ -79,19 +83,19 @@ export const deleteEvent = async (id) => {
             throw new Error("User not found");
         }
 
-          // 🔹 Convert ObjectId to String before comparison
-          const eventOwnerId = event.userId.toString(); // Convert ObjectId to string
-          const currentUserId = existingUser._id.toString(); // Convert User's ObjectId to string
-  
-          // 🔹 Ensure the user is the owner of the event
-          if (eventOwnerId !== currentUserId) {
-              throw new Error("Unauthorized: You do not have permission to delete this event.");
-          }
-  
-          // 🔹 Delete the event
-          await Event.findByIdAndDelete(id);
-  
-          return { success: true, message: "Event deleted successfully." };
+        // 🔹 Convert ObjectId to String before comparison
+        const eventOwnerId = event.userId.toString(); // Convert ObjectId to string
+        const currentUserId = existingUser._id.toString(); // Convert User's ObjectId to string
+
+        // 🔹 Ensure the user is the owner of the event
+        if (eventOwnerId !== currentUserId) {
+            throw new Error("Unauthorized: You do not have permission to delete this event.");
+        }
+
+        // 🔹 Delete the event
+        await Event.findByIdAndDelete(id);
+
+        return { success: true, message: "Event deleted successfully." };
     } catch (error) {
         throw new Error("Failed to delete event: " + error.message);
     }
@@ -103,7 +107,7 @@ export const getEventsDetails = async (name, eventId) => {
 
     try {
         // Fetch the event and populate userId (user details)
-        const event = await Event.findById(eventId) 
+        const event = await Event.findById(eventId)
             .populate({
                 path: "userId",
                 model: "User",   // ✅ Explicitly define the User model
@@ -115,8 +119,8 @@ export const getEventsDetails = async (name, eventId) => {
             throw new Error("Event not found");
         }
 
-         // ✅ Ensure user exists
-         if (!event.userId) {
+        // ✅ Ensure user exists
+        if (!event.userId) {
             throw new Error("User details not found for this event");
         }
 
@@ -127,3 +131,112 @@ export const getEventsDetails = async (name, eventId) => {
         throw new Error("Failed to fetch event details: " + error.message);
     }
 }
+
+
+export const getEventAvailability = async (eventId) => {
+    await ConnectDb();
+
+    try {
+        const event = await Event.findById(eventId)
+            .populate({
+                path: 'userId',
+                model: 'User',
+                populate: {
+                    path: 'availability',
+                    populate: {
+                        path: 'days',
+                        select: 'day startTime endTime'
+                    }
+                }
+            })
+            .populate('bookings', 'startTime endTime')
+            .lean();
+
+        if (!event || !event.userId || !event.userId.availability || !Array.isArray(event.userId.availability.days)) {
+            console.error("No availability found for the event.");
+            return [];
+        }
+
+
+        const { availability, bookings } = event.userId;
+
+        const startDate = startOfDay(new Date());
+        const endDate = addDays(startDate, 30);
+
+        const availableDates = [];
+
+        for (let date = startDate; date <= endDate; date = addDays(startDate, 1)) {
+            const dayOfWeek = format(date, 'EEEE').toUpperCase();
+            const dayAvailability = availability?.days?.find((d) => d.day === dayOfWeek);
+
+            if (dayAvailability) {
+                const dateStr = format(date, 'yyyy-MM-dd');
+
+                const slots = genrateAvailableTimeSlot(
+                    dayAvailability.startTime,
+                    dayAvailability.endTime,
+                    event.duration,
+                    bookings,
+                    dateStr,
+                    availability.timeGap
+                );
+
+                availableDates.push({
+                    date: dateStr,
+                    slots,
+                });
+            }
+        }
+
+        return availableDates;
+
+    } catch (error) {
+        throw new Error("Failed to fetch event availability: " + error.message);
+    }
+};
+
+
+
+function genrateAvailableTimeSlot(startTime, endTime, duration, bookings, dateStr, timeGap = 0) {
+    const slots = [];
+
+    let currentTime = parseISO(`${dateStr}T${startTime.toISOString().slice(11, 16)}`);
+    const slotEndTime = parseISO(`${dateStr}T${endTime.toISOString().slice(11, 16)}`);
+
+
+    const now = new Date();
+    if (format(now, "yyyy-MM-dd") === dateStr) {
+        currentTime = isBefore(currentTime, now)
+            ? addMinutes(now, timeGap)
+            : currentTime;
+    }
+
+
+    while (currentTime < slotEndTime) {
+        const slotEnd = new Date(currentTime.getTime() + duration * 60000);
+
+        const isSlotAvailable = !bookings.some(({ startTime, endTime }) => {
+            const bookingStart = parseISO(startTime);
+            const bookingEnd = parseISO(endTime);
+            return (
+                (currentTime >= bookingStart && currentTime < bookingEnd) ||
+                (slotEnd > bookingStart && slotEnd <= bookingEnd) ||
+                (currentTime <= bookingStart && slotEnd >= bookingEnd)
+            );
+        });
+
+        if (isSlotAvailable) {
+            slots.push(format(currentTime, "HH:mm"));
+        }
+
+        currentTime = slotEnd;
+    }
+
+    return slots;
+}
+
+
+
+
+
+
