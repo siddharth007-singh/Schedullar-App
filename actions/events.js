@@ -4,7 +4,7 @@ import ConnectDb from "@/lib/Db"
 import Event from "@/models/event.model";
 import User from "@/models/user.model";
 import { currentUser } from "@clerk/nextjs/server";
-import { addDays, format, parseISO, startOfDay } from "date-fns";
+import { addDays, format, parseISO, startOfDay, addMinutes } from "date-fns";
 import Availability from "@/models/available.model";
 import DayAvailability from "@/models/dayavailable.model";
 import mongoose from "mongoose";
@@ -160,12 +160,17 @@ export const getEventAvailability = async (eventId) => {
 
         const { availability, bookings } = event.userId;
 
+        if (!availability || !availability.days || availability.days.length === 0) {
+            console.warn("Warning: No available days configured.");
+            return [];
+        }
+
         const startDate = startOfDay(new Date());
         const endDate = addDays(startDate, 30);
 
         const availableDates = [];
 
-        for (let date = startDate; date <= endDate; date = addDays(startDate, 1)) {
+        for (let date = startDate; date <= endDate; date = addDays(date, 1)) {
             const dayOfWeek = format(date, 'EEEE').toUpperCase();
             const dayAvailability = availability?.days?.find((d) => d.day === dayOfWeek);
 
@@ -176,21 +181,24 @@ export const getEventAvailability = async (eventId) => {
                     dayAvailability.startTime,
                     dayAvailability.endTime,
                     event.duration,
-                    bookings,
+                    bookings || [],
                     dateStr,
-                    availability.timeGap
+                    availability.timeGap || 0
                 );
 
-                availableDates.push({
-                    date: dateStr,
-                    slots,
-                });
+                if (slots.length > 0) {
+                    availableDates.push({
+                        date: dateStr,
+                        slots,
+                    });
+                }
             }
         }
 
         return availableDates;
 
     } catch (error) {
+        console.error("Error fetching event availability:", error);
         throw new Error("Failed to fetch event availability: " + error.message);
     }
 };
@@ -212,8 +220,12 @@ function genrateAvailableTimeSlot(startTime, endTime, duration, bookings, dateSt
     }
 
 
-    while (currentTime < slotEndTime) {
-        const slotEnd = new Date(currentTime.getTime() + duration * 60000);
+    // ✅ Prevent infinite loops
+    let maxIterations = 1000; // Limit to 1000 iterations
+    let iteration = 0;
+
+    while (currentTime < slotEndTime && iteration < maxIterations) {
+        const slotEnd = addMinutes(currentTime, duration);
 
         const isSlotAvailable = !bookings.some(({ startTime, endTime }) => {
             const bookingStart = parseISO(startTime);
@@ -229,7 +241,8 @@ function genrateAvailableTimeSlot(startTime, endTime, duration, bookings, dateSt
             slots.push(format(currentTime, "HH:mm"));
         }
 
-        currentTime = slotEnd;
+        currentTime = addMinutes(currentTime, duration);
+        iteration++;
     }
 
     return slots;
