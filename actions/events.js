@@ -4,7 +4,7 @@ import ConnectDb from "@/lib/Db"
 import Event from "@/models/event.model";
 import User from "@/models/user.model";
 import { currentUser } from "@clerk/nextjs/server";
-import { addDays, format, parseISO, startOfDay, addMinutes } from "date-fns";
+import { addDays, format, parseISO, startOfDay, addMinutes, isBefore } from "date-fns";
 import Availability from "@/models/available.model";
 import DayAvailability from "@/models/dayavailable.model";
 import mongoose from "mongoose";

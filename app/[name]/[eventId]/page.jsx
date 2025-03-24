@@ -64,7 +64,7 @@ const EventBookingPage = async ({ params: paramsPromise }) => {
     return (
       <div className='flex flex-col justify-center lg:flex-row px-4 py-8'>
         <EventsDetails event={event} />
-        <BookingForm />
+        <BookingForm event={event}  availability={availability}/>
       </div>
     );
   } catch (error) {

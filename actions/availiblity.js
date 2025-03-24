@@ -122,6 +122,3 @@ export const updateAvailability = async (data) => {
         return { success: false, error: error.message };
     }
 };
-
-
-// 3:21
