@@ -42,9 +42,9 @@ const Userpage = async ({ params }) => {
   try {
     const user = await getuserByName(firstName);
 
-    if (!user) {
-      return notFound();
-    }
+    // if (!user) {
+    //   return notFound();
+    // }
 
     return (
       <div className="container mx-auto px-4 py-8">
